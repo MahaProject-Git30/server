@@ -1,19 +1,21 @@
 import User from "../models/User.js";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
-import transporter from "../config/mail.js";
+import { Resend } from "resend";
 import crypto from "crypto";
 
+const resend = new Resend(process.env.RESEND_API_KEY);
+
+// ✅ REGISTER
 export const registerUser = async (req, res) => {
   try {
-
     const { name, email, mobile, password } = req.body;
 
     const existingUser = await User.findOne({ email });
 
     if (existingUser) {
       return res.status(400).json({
-        message: "User already exists"
+        message: "User already exists",
       });
     }
 
@@ -23,29 +25,29 @@ export const registerUser = async (req, res) => {
       name,
       email,
       mobile,
-      password: hashedPassword
+      password: hashedPassword,
     });
 
     res.json({
-      message: "Register successful"
+      message: "Register successful",
     });
 
   } catch (error) {
+    console.log("REGISTER ERROR:", error);
     res.status(500).json({ message: error.message });
   }
 };
 
-
+// ✅ LOGIN
 export const loginUser = async (req, res) => {
   try {
-
     const { email, password } = req.body;
 
     const user = await User.findOne({ email });
 
     if (!user) {
       return res.status(400).json({
-        message: "User not found"
+        message: "User not found",
       });
     }
 
@@ -53,7 +55,7 @@ export const loginUser = async (req, res) => {
 
     if (!isMatch) {
       return res.status(400).json({
-        message: "Wrong password"
+        message: "Wrong password",
       });
     }
 
@@ -65,25 +67,26 @@ export const loginUser = async (req, res) => {
 
     res.json({
       message: "Login successful",
-      token
+      token,
     });
 
   } catch (error) {
+    console.log("LOGIN ERROR:", error);
     res.status(500).json({ message: error.message });
   }
 };
 
-
+// ✅ FORGOT PASSWORD
 export const forgotPassword = async (req, res) => {
   try {
-
     const { email } = req.body;
 
     const user = await User.findOne({ email });
 
+    // 🔐 security (don’t reveal user existence)
     if (!user) {
-      return res.status(400).json({
-        message: "User not found"
+      return res.json({
+        message: "If this email exists, reset link sent",
       });
     }
 
@@ -97,40 +100,43 @@ export const forgotPassword = async (req, res) => {
     const resetLink =
       `${process.env.CLIENT_URL}/change-password/${resetToken}`;
 
-    await transporter.sendMail({
-      from: process.env.EMAIL,
+    const data = await resend.emails.send({
+      from: "onboarding@resend.dev",
       to: email,
       subject: "Password Reset",
       html: `
         <h2>Password Reset</h2>
-        <a href="${resetLink}">Click here to reset</a>
-      `
+        <p>Click below to reset your password:</p>
+        <a href="${resetLink}">${resetLink}</a>
+      `,
     });
 
+    console.log("EMAIL SENT:", data);
+
     res.json({
-      message: "Reset link sent to email"
+      message: "Reset link sent to email",
     });
 
   } catch (error) {
+    console.log("FORGOT ERROR:", error);
     res.status(500).json({ message: error.message });
   }
 };
 
-
+// ✅ RESET PASSWORD
 export const resetPassword = async (req, res) => {
   try {
-
     const { token } = req.params;
     const { password } = req.body;
 
     const user = await User.findOne({
       resetToken: token,
-      resetTokenExpire: { $gt: Date.now() }
+      resetTokenExpire: { $gt: Date.now() },
     });
 
     if (!user) {
       return res.status(400).json({
-        message: "Invalid or expired token"
+        message: "Invalid or expired token",
       });
     }
 
@@ -143,10 +149,11 @@ export const resetPassword = async (req, res) => {
     await user.save();
 
     res.json({
-      message: "Password updated successfully"
+      message: "Password updated successfully",
     });
 
   } catch (error) {
+    console.log("RESET ERROR:", error);
     res.status(500).json({ message: error.message });
   }
 };
