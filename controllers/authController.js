@@ -1,10 +1,8 @@
 import User from "../models/User.js";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
-import { Resend } from "resend";
+import transporter from "../config/mail.js";
 import crypto from "crypto";
-
-const resend = new Resend(process.env.RESEND_API_KEY);
 
 // ✅ REGISTER
 export const registerUser = async (req, res) => {
@@ -31,9 +29,8 @@ export const registerUser = async (req, res) => {
     res.json({
       message: "Register successful",
     });
-
   } catch (error) {
-    console.log("REGISTER ERROR:", error);
+    console.log("REGISTER ERROR:", error.message);
     res.status(500).json({ message: error.message });
   }
 };
@@ -43,7 +40,7 @@ export const loginUser = async (req, res) => {
   try {
     const { email, password } = req.body;
 
-    const user = await User.findOne({ email });
+    const user = await User.findOne({ email }).select("+password");
 
     if (!user) {
       return res.status(400).json({
@@ -69,9 +66,8 @@ export const loginUser = async (req, res) => {
       message: "Login successful",
       token,
     });
-
   } catch (error) {
-    console.log("LOGIN ERROR:", error);
+    console.log("LOGIN ERROR:", error.message);
     res.status(500).json({ message: error.message });
   }
 };
@@ -83,7 +79,7 @@ export const forgotPassword = async (req, res) => {
 
     const user = await User.findOne({ email });
 
-    // 🔐 security (don’t reveal user existence)
+    // 🔐 Don't reveal user existence
     if (!user) {
       return res.json({
         message: "If this email exists, reset link sent",
@@ -93,32 +89,35 @@ export const forgotPassword = async (req, res) => {
     const resetToken = crypto.randomBytes(32).toString("hex");
 
     user.resetToken = resetToken;
-    user.resetTokenExpire = Date.now() + 10 * 60 * 1000;
+    user.resetTokenExpire = Date.now() + 10 * 60 * 1000; // 10 mins
 
     await user.save();
 
-    const resetLink =
-      `${process.env.CLIENT_URL}/change-password/${resetToken}`;
+    const resetLink = `http://localhost:5173/change-password/${resetToken}`;
 
-    const data = await resend.emails.send({
-      from: "onboarding@resend.dev",
-      to: email,
+    // ✅ SEND EMAIL
+    const mailOptions = {
+      from: process.env.EMAIL,
+      to: user.email,
       subject: "Password Reset",
       html: `
-        <h2>Password Reset</h2>
-        <p>Click below to reset your password:</p>
+        <h3>Password Reset</h3>
+        <p>You requested to reset your password.</p>
+        <p>Click below link:</p>
         <a href="${resetLink}">${resetLink}</a>
+        <p>This link will expire in 10 minutes.</p>
       `,
-    });
+    };
 
-    console.log("EMAIL SENT:", data);
+    await transporter.sendMail(mailOptions);
+
+    console.log("Reset email sent to:", user.email);
 
     res.json({
       message: "Reset link sent to email",
     });
-
   } catch (error) {
-    console.log("FORGOT ERROR:", error);
+    console.log("FORGOT ERROR:", error.message);
     res.status(500).json({ message: error.message });
   }
 };
@@ -151,9 +150,8 @@ export const resetPassword = async (req, res) => {
     res.json({
       message: "Password updated successfully",
     });
-
   } catch (error) {
-    console.log("RESET ERROR:", error);
+    console.log("RESET ERROR:", error.message);
     res.status(500).json({ message: error.message });
   }
 };

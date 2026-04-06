@@ -10,7 +10,10 @@ const userSchema = new mongoose.Schema({
   email: {
     type: String,
     required: true,
-    unique: true
+    unique: true,
+    lowercase: true,
+  trim: true,
+  match: [/^\S+@\S+\.\S+$/, "Please use valid email"]
   },
 
   mobile: {
@@ -20,7 +23,9 @@ const userSchema = new mongoose.Schema({
 
   password: {
     type: String,
-    required: true
+    required: true,
+    minlength: 6,
+    maxlength: 20,
   },
 
   resetToken: String,
