@@ -10,7 +10,7 @@ connectDB();
 const app = express();
 
 app.use(cors({
-  origin: "https://pwdclientpro.netlify.app/",
+  origin: "https://pwdclientpro.netlify.app",
   credentials: true
 }));
 
