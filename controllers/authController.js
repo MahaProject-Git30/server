@@ -97,7 +97,7 @@ export const forgotPassword = async (req, res) => {
 
     // ✅ SEND EMAIL
     const mailOptions = {
-      from: process.env.EMAIL,
+      from: process.env.EMAIL_USER,
       to: user.email,
       subject: "Password Reset",
       html: `
