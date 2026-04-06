@@ -3,6 +3,12 @@ import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import transporter from "../config/mail.js";
 import crypto from "crypto";
+import SibApiV3Sdk from "sib-api-v3-sdk";
+
+const client = SibApiV3Sdk.ApiClient.instance;
+client.authentications["api-key"].apiKey = process.env.BREVO_API_KEY;
+
+const tranEmailApi = new SibApiV3Sdk.TransactionalEmailsApi();
 
 // ✅ REGISTER
 export const registerUser = async (req, res) => {
@@ -56,11 +62,9 @@ export const loginUser = async (req, res) => {
       });
     }
 
-    const token = jwt.sign(
-      { id: user._id },
-      process.env.JWT_SECRET,
-      { expiresIn: "1d" }
-    );
+    const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, {
+      expiresIn: "1d",
+    });
 
     res.json({
       message: "Login successful",
@@ -96,21 +100,16 @@ export const forgotPassword = async (req, res) => {
     const resetLink = `https://pwdclientpro.netlify.app/change-password/${resetToken}`;
 
     // ✅ SEND EMAIL
-    const mailOptions = {
-      from: process.env.EMAIL_USER,
-      to: user.email,
+    await tranEmailApi.sendTransacEmail({
+      sender: { email: "your_verified_email@brevo.com" },
+      to: [{ email: user.email }],
       subject: "Password Reset",
-      html: `
+      htmlContent: `
         <h3>Password Reset</h3>
-        <p>You requested to reset your password.</p>
         <p>Click below link:</p>
         <a href="${resetLink}">${resetLink}</a>
-        <p>This link will expire in 10 minutes.</p>
-      `,
-    };
-
-    await transporter.sendMail(mailOptions);
-
+  `,
+    });
     console.log("Reset email sent to:", user.email);
 
     res.json({
