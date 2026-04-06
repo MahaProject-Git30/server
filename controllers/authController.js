@@ -81,15 +81,17 @@ export const forgotPassword = async (req, res) => {
   try {
     const { email } = req.body;
 
+    // 🔍 Check user
     const user = await User.findOne({ email });
 
-    // 🔐 Don't reveal user existence
+    // 🔐 Don't reveal if user exists
     if (!user) {
       return res.json({
         message: "If this email exists, reset link sent",
       });
     }
 
+    // 🔑 Generate token
     const resetToken = crypto.randomBytes(32).toString("hex");
 
     user.resetToken = resetToken;
@@ -97,30 +99,50 @@ export const forgotPassword = async (req, res) => {
 
     await user.save();
 
+    // 🔗 Frontend reset link
     const resetLink = `https://pwdclientpro.netlify.app/change-password/${resetToken}`;
 
-    // ✅ SEND EMAIL
-    await tranEmailApi.sendTransacEmail({
-      sender: { email: "your_verified_email@brevo.com" },
-      to: [{ email: user.email }],
-      subject: "Password Reset",
-      htmlContent: `
-        <h3>Password Reset</h3>
-        <p>Click below link:</p>
-        <a href="${resetLink}">${resetLink}</a>
-  `,
-    });
-    console.log("Reset email sent to:", user.email);
+    try {
+      // 📧 Send email via Brevo API
+      await tranEmailApi.sendTransacEmail({
+        sender: {
+          email: "rajmaharichi30@gmail.com", // ✅ MUST be verified in Brevo
+          name: "Maha App",
+        },
+        to: [{ email: user.email }],
+        subject: "Password Reset",
+        htmlContent: `
+          <h3>Password Reset</h3>
+          <p>You requested to reset your password.</p>
+          <p>Click below link:</p>
+          <a href="${resetLink}">${resetLink}</a>
+          <p>This link will expire in 10 minutes.</p>
+        `,
+      });
 
-    res.json({
-      message: "Reset link sent to email",
-    });
+      console.log("✅ Email sent to:", user.email);
+
+      return res.json({
+        message: "Reset link sent to email",
+      });
+    } catch (mailError) {
+      console.log(
+        "❌ EMAIL ERROR:",
+        mailError.response?.body || mailError.message,
+      );
+
+      return res.status(500).json({
+        message: "Email sending failed",
+      });
+    }
   } catch (error) {
-    console.log("FORGOT ERROR:", error.message);
-    res.status(500).json({ message: error.message });
+    console.log("❌ FORGOT ERROR:", error.message);
+
+    return res.status(500).json({
+      message: "Something went wrong",
+    });
   }
 };
-
 // ✅ RESET PASSWORD
 export const resetPassword = async (req, res) => {
   try {
